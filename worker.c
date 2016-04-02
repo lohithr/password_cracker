@@ -18,6 +18,93 @@ void error(const char *msg)//prints error messages
     exit(0);
 }
 
+bool crack(string hash,string a)//checks the hash with a password
+{
+    string ssalt="";
+    ssalt+=hash[0];
+    ssalt+=hash[1];
+    const char *salt=ssalt.c_str();
+    const char *passwd=a.c_str();
+    char *stemp=crypt(passwd,salt);
+    string t1(stemp);
+    if(t1==hash){
+        return true;
+    }
+    else {return false;}
+
+}
+
+//backtracks the bruteforce search
+string backtrack(string a,int pos,string flags){
+    if(pos<0){
+        for (int i = 0; i < a.length(); ++i)
+        {
+            if(flags[0]=='1')a[i]='a';
+            else if(flags[1]=='1')a[i]='A';
+            else if(flags[2]=='1')a[i]='0';
+        }
+        return a;
+    }
+    if(97<=a[pos] && a[pos]<=122)
+    {
+        if(a[pos]==122){
+            if(flags[1]=='1'){
+                a[pos]='A';
+                return a;
+            }
+            else if(flags[2]=='1'){
+                a[pos]='0';
+                return a;
+            }
+            else
+            {
+                if(flags[0]=='1')a[pos]='a';
+                else if(flags[1]=='1')a[pos]='A';
+                else if(flags[2]=='1')a[pos]='0';
+                return backtrack(a,pos-1,flags);
+            }
+
+        }
+       else{
+        a[pos]+=1;
+        return a;
+        }
+    }
+    else if(65<=a[pos] && a[pos]<=90)
+    {
+        if(a[pos]==90){
+            if(flags[2]=='1'){
+                a[pos]='0';
+                return a;
+            }
+            else{
+                if(flags[0]=='1')a[pos]='a';
+                else if(flags[1]=='1')a[pos]='A';
+                else if(flags[2]=='1')a[pos]='0';
+                return backtrack(a,pos-1,flags);
+            }
+        }
+        else{
+            a[pos]+=1;
+            return a;
+        }
+    }
+    else if(48<=a[pos] && a[pos]<=57)
+    {
+        if(a[pos]==57){
+                if(flags[0]=='1')a[pos]='a';
+                else if(flags[1]=='1')a[pos]='A';
+                else if(flags[2]=='1')a[pos]='0';
+                return backtrack(a,pos-1,flags);
+        }
+        else{
+            a[pos]+=1;
+            return a;
+        }
+    }
+}
+
+
 int main(int argc, char *argv[])
 {
     int sockfd, portno, n;
@@ -51,6 +138,15 @@ int main(int argc, char *argv[])
     if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) 
         error("ERROR connecting");
 
+    //contacting server for first time
+    n = write(sockfd,"1",1);
+    if (n < 0){
+     error("Unable to write to socket");
+    }
+
+    //forever loop 
+    for(;;){
+
     //reading from the socket
     bzero(buffer,256);
     n = read(sockfd,buffer,255);
@@ -60,105 +156,185 @@ int main(int argc, char *argv[])
 
     //breaking the data into required parts
     string buf=buffer;
-    string start="",hash="";
+    string start="",hash="",flags="";
     int i=0;
 
+    // cout<<start<<" "<<hash<<" "<<flags<<" "<<endl;
+
     //start contains the starting point of iteration
-    for(i=4;buf[i]!=' ';i++)
+    for(;buf[i]!=' ';i++)
     {
         start+=buf[i];
     }
     i++;
 
-    //pos indicates the position to be iterated
-    int pos;
-    for(;buf[i]!=' ';i++)
-    {
-    pos=buf[i]-48;
-    }
-    i++;
-
     //hash contains the hash sent by the server
-    for(;i<buf.length();i++)
+    for(;buf[i]!=' ';i++)
     {
         hash+=buf[i];
     }
+    i++;
 
+    for (; i < buf.length(); ++i)
+    {
+        flags+=buf[i];
+    }
     bool success=0; // flag to know whether password is cracked or not
 
-    //iterating on capital alphabets if corresponding flag is set
-    if(buf[0]==49){
-        string temp=start;
-        temp[pos]='A';
-        for(int j=0;j<25;j++){
-            string ssalt="";
-            ssalt+=hash[0];
-            ssalt+=hash[1];
-            const char *salt=ssalt.c_str();
-            const char *passwd=temp.c_str();
-            char *stemp=crypt(passwd,salt);
-            string t1(stemp);
-            if(t1==hash){
-                 n = write(sockfd,passwd,sizeof(passwd));
-                if (n < 0) error("ERROR writing to socket");
-                break;
-                success=1;
-            }
-            temp[pos]+=1;
-        }
+    string a="";string passwd="";
+    for (int i = 0; i < start.length()-1; ++i)
+    {
+        a+=start[i+1];
     }
 
-    //iterating on small alphabets if corresponding flag is set
-    if(buf[1]==49){
-        string temp=start;
-        temp[pos]='a';
-        for(int j=0;j<25;j++){
-            string ssalt="";
-            ssalt+=hash[0];
-            ssalt+=hash[1];
-            const char *salt=ssalt.c_str();
-            const char *passwd=temp.c_str();
-            char *stemp=crypt(passwd,salt);
-            string t1(stemp);
-            if(t1==hash){
-                 n = write(sockfd,passwd,sizeof(passwd));
-                if (n < 0) error("ERROR writing to socket");
-                break;
-                success=1;
+    string fin0a="",fin1a="",fin2a="";
+    for (int i = 0; i < a.length(); ++i)
+    {
+        fin0a+="a";fin1a+="A";fin2a+="0";
+    }
+    passwd+=start[0];
+
+    //loop for iterating over all possibilities
+    do{
+        if(97<=a[a.length()-1] && a[a.length()-1]<=122)
+    {
+        if(a[a.length()-1]==122){
+            if(flags[1]=='1'){
+                a[a.length()-1]='A';
+                if(crack(hash,start[0]+a)){
+                    for (int i = 0; i < a.length(); ++i)
+                    {
+                        passwd+=a[i];
+                    }
+                    success=1;break;
+                }
+                continue;
             }
-            temp[pos]+=1;
+            else if(flags[2]=='1'){
+                a[a.length()-1]='0';
+                if(crack(hash,start[0]+a)){
+                    for (int i = 0; i < a.length(); ++i)
+                    {
+                        passwd+=a[i];
+                    }
+                    success=1;break;
+                }
+                continue;
+            }
+            else
+            {
+                if(flags[0]=='1')a[a.length()-1]='a';
+                else if(flags[1]=='1')a[a.length()-1]='A';
+                else if(flags[2]=='1')a[a.length()-1]='0';
+                a=backtrack(a,a.length()-2,flags);
+                if(crack(hash,start[0]+a)){
+                    for (int i = 0; i < a.length(); ++i)
+                    {
+                        passwd+=a[i];
+                    }
+                    success=1;break;
+                }
+                continue;
+            }
+
+        }
+       else{
+        a[a.length()-1]+=1;
+        if(crack(hash,start[0]+a)){
+            for (int i = 0; i < a.length(); ++i)
+            {
+                passwd+=a[i];
+            }
+            success=1;break;
+        }
+        continue;
         }
     }
-
-    //iterating on numeric character if corresponding flag is set
-    if(buf[2]==49){
-        string temp=start;
-        temp[pos]='0';
-        for(int j=0;j<9;j++){
-            string ssalt="";
-            ssalt+=hash[0];
-            ssalt+=hash[1];
-            const char *salt=ssalt.c_str();
-            const char *passwd=temp.c_str();
-            char *stemp=crypt(passwd,salt);
-            string t1(stemp);
-            if(t1==hash){
-                 n = write(sockfd,passwd,sizeof(passwd));
-                if (n < 0) error("ERROR writing to socket");
-                break;
-                success=1;
+    else if(65<=a[a.length()-1] && a[a.length()-1]<=90)
+    {
+        if(a[a.length()-1]==90){
+            if(flags[2]=='1'){
+                a[a.length()-1]='0';
+                if(crack(hash,start[0]+a)){
+                    for (int i = 0; i < a.length(); ++i)
+                    {
+                        passwd+=a[i];
+                    }
+                    success=1;break;
+                }
+                continue;
             }
-            temp[pos]+=1;
+            else{
+                if(flags[0]=='1')a[a.length()-1]='a';
+                else if(flags[1]=='1')a[a.length()-1]='A';
+                else if(flags[2]=='1')a[a.length()-1]='0';
+                a=backtrack(a,a.length()-2,flags);
+                if(crack(hash,start[0]+a)){
+                    for (int i = 0; i < a.length(); ++i)
+                    {
+                        passwd+=a[i];
+                    }
+                    success=1;break;
+                }
+                continue;
+            }
+        }
+        else{
+            a[a.length()-1]+=1;
+            if(crack(hash,start[0]+a)){
+                for (int i = 0; i < a.length(); ++i)
+                {
+                    passwd+=a[i];
+                }
+                success=1;break;
+            }
+            continue;
         }
     }
+    else if(48<=a[a.length()-1] && a[a.length()-1]<=57)
+    {
+        if(a[a.length()-1]==57){
+                if(flags[0]=='1')a[a.length()-1]='a';
+                else if(flags[1]=='1')a[a.length()-1]='A';
+                else if(flags[2]=='1')a[a.length()-1]='0';
+                a=backtrack(a,a.length()-2,flags);
+                if(crack(hash,start[0]+a)){
+                    for (int i = 0; i < a.length(); ++i)
+                    {
+                        passwd+=a[i];
+                    }
+                    success=1;break;
+                }
+                continue;
+        }
+        else{
+            a[a.length()-1]+=1;
+            if(crack(hash,start[0]+a)){
+                    for (int i = 0; i < a.length(); ++i)
+                    {
+                        passwd+=a[i];
+                    }
+                    success=1;break;
+                }
+            continue;
+        }
+    }
+    }while((flags[0]=='1' && a!=fin0a) || (flags[1]=='1' && flags[0]=='0' && a!=fin1a) || (flags[2]=='1' && flags[1]=='0' && flags[0]=='0' && a!=fin2a));
 
-    //returning failure on being unable to crack the password
+    //writing failure or password on cracking password
     if(!success){
-        n = write(sockfd,"failed",6);
+        n = write(sockfd,"1 0",3);
+        if (n < 0) error("ERROR writing to socket");
+    }
+    else{
+        passwd="1 1 "+passwd;
+        cout<<passwd;
+        const char *cracked=passwd.c_str();
+        n = write(sockfd,cracked,strlen(cracked));
         if (n < 0) error("ERROR writing to socket");
     }
 
-
+}
     close(sockfd);
     return 0;
 }
