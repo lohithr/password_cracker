@@ -9,6 +9,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <crypt.h>
+#include <arpa/inet.h>
 
 using namespace std;
 
@@ -124,17 +125,19 @@ int main(int argc, char *argv[])
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) 
         error("ERROR opening socket");
-    server = gethostbyname(argv[1]);
+    /*server = gethostbyname(argv[1]);
     if (server == NULL) {
         fprintf(stderr,"ERROR, no such host\n");
         exit(0);
-    }
+    }*/
     bzero((char *) &serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
-    bcopy((char *)server->h_addr, 
+    /*bcopy((char *)server->h_addr, 
          (char *)&serv_addr.sin_addr.s_addr,
-         server->h_length);
+         server->h_length);*/
     serv_addr.sin_port = htons(portno);
+    inet_aton(argv[1],&(serv_addr.sin_addr));
+    memset(&(serv_addr.sin_zero),'\0',8);
     if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) 
         error("ERROR connecting");
 
@@ -153,13 +156,14 @@ int main(int argc, char *argv[])
     if (n < 0){
      error("Unable to read from socket");
     }
-
+	
     //breaking the data into required parts
     string buf=buffer;
+    cout<<buf<<endl;
     string start="",hash="",flags="";
     int i=0;
 
-    // cout<<start<<" "<<hash<<" "<<flags<<" "<<endl;
+    cout<<start<<" "<<hash<<" "<<flags<<" "<<endl;
 
     //start contains the starting point of iteration
     for(;buf[i]!=' ';i++)
@@ -328,7 +332,7 @@ int main(int argc, char *argv[])
     }
     else{
         passwd="1 1 "+passwd;
-        cout<<passwd;
+        cout<<passwd<<endl;
         const char *cracked=passwd.c_str();
         n = write(sockfd,cracked,strlen(cracked));
         if (n < 0) error("ERROR writing to socket");
